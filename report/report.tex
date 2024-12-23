@@ -1,0 +1,86 @@
+%! Author = nadav
+%! Date = 13/12/2024
+
+\documentclass[a4paper]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage[margin=1in]{geometry}
+
+\title{DRL - HW 2}
+\author{Nadav Shoham 315789115 \\ Uri Rusanov}
+\date{\today}
+\begin{document}
+
+\maketitle
+
+\section{Monte-Carlo Policy Gradient (REINFORCE)}\label{sec:monte-carlo-policy-gradient-(reinforce)}
+
+\subsection{What does the value of the advantage estimate reflect?}\label{subsec:what-does-the-value-of-the-advantage-estimate-reflect?}
+The advantage estimate reflects how much better or worse taking a particular action in a given state is compared to the expected outcome defined by the baseline (typically the value function).
+It quantifies the relative benefit of choosing that action.
+
+\subsection{Why is it better to follow the gradient computed with the advantage estimate instead of just the return itself?}\label{subsec:why-is-it-better-to-follow-the-gradient-computed-with-the-advantage-estimate-instead-of-just-the-return-itself?}
+Using the advantage estimate reduces the variance in the policy gradient updates without introducing bias.
+Subtracting the baseline (e.g., value function) focuses the updates on meaningful deviations from the baseline, ensuring that updates are more stable and effective.
+
+\subsection{What is the prerequisite condition for the equation to hold true?}\label{subsec:what-is-the-prerequisite-condition-for-the-equation-to-hold-true?-prove-the-equation.}
+The baseline \( b(s) \) must be an unbiased estimate of the return, ensuring that \( \mathbb{E}_{\pi_\theta}[b(s)] \) is well-defined.
+\\
+\\
+\textbf{Proof The equation holds}
+Expand the expectation over the policy distribution:
+\[
+\mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \log \pi_\theta(a \mid s) b(s) \right] = \sum_s d^\pi \sum_a \pi_\theta(a \mid s) \nabla_\theta \log \pi_\theta(a \mid s) b(s).
+\]
+Where \( d^\pi \) is the stationary distribution of the policy.
+Using the property of the log-gradient:
+\[
+\nabla_\theta \log \pi_\theta(a \mid s) \pi_\theta(a \mid s) = \nabla_\theta \pi_\theta(a \mid s),
+\]
+the sum becomes:
+\[
+\sum_s d^\pi b(s) \sum_a \nabla_\theta \pi_\theta(a \mid s).
+\]
+Probabilities sum to 1 so their gradients sum to 0:
+\[
+\sum_a \nabla_\theta \pi_\theta(a \mid s) = 0.
+\]
+Thus, the entire term sums to 0:
+\[
+\mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \log \pi_\theta(a_t \mid s_t) b(s_t) \right] = 0.
+\]
+\section{Advantage Actor-Critic}\label{sec:advantage-actor-critic}
+
+\subsection{Why is using the TD-error of the value function practically the same as using the advantage estimate?}\label{subsec:why-is-using-the-td-error-of-the-value-function-practically-the-same-as-using-the-advantage-estimate?-prove.}
+The TD-error is an unbiased estimate of the advantage function \(A_t\).
+\\
+Over multiple steps, the expectation of the TD-error aligns with the advantage estimate.
+Specifically:
+\[
+\mathbb{E}[\delta_t | s_t, a_t] = A(s_t, a_t),
+\]
+
+\subsection*{Proof}
+To prove the equivalence, we expand and analyze both expressions:
+\begin{gather*}
+    A(s_t, a_t) = Q(s_t, a_t) - V(s_t) = \mathbb{E}[r_t + \gamma V(s_{t+1}) | s_t, a_t] - V(s_t).\\
+    \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t).
+\end{gather*}
+Taking the expectation of $\delta_t$ conditioned on $s_t$ and $a_t$:
+\begin{align*}
+    \mathbb{E}[\delta_t | s_t, a_t] &= \mathbb{E}[r_t | s_t, a_t + \gamma V(s_{t+1}) | s_t, a_t - V(s_t)].\\
+   &= \mathbb{E}[r_t + \gamma V(s_{t+1}) | s_t, a_t] - \mathbb{E}[V(s_t)].
+\end{align*}
+Substituting $\mathbb{E}[r_t + \gamma V(s_{t+1}) | s_t, a_t] = Q(s_t, a_t)$ and $\mathbb{E}[V(s_t)] = V(s_t)$, we get:
+    \begin{align*}
+    \mathbb{E}[\delta_t | s_t, a_t] &= Q(s_t, a_t) - V(s_t) = A(s_t, a_t).
+    \end{align*}
+
+\subsection{Explain the actor and the critic roles in the model.}\label{subsec:explain-the-actor-and-the-critic-roles-in-the-model.}
+The actor parameterizes the policy and is responsible for selecting actions based on the current policy.
+It optimizes the policy directly using feedback.
+The critic evaluates the actions chosen by estimating the value function \(V(s_t)\).
+It provides feedback to the actor by computing the TD-error or advantage, guiding the policy updates.
+
+
+\end{document}
