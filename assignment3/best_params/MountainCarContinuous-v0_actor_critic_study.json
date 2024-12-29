@@ -1,0 +1,8 @@
+{
+    "hidden_sizes_theta": "[32, 128, 32]",
+    "hidden_sizes_w": "[32, 128, 32]",
+    "gamma": 0.99,
+    "alpha_theta": 0.0007,
+    "alpha_w": 0.0007,
+    "dropout_p": 0.4
+}

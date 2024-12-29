@@ -13,9 +13,9 @@ ENV_ACT_DIM = {
     "MountainCarContinuous-v0": 1
 }
 
-# If you know your max_input_dim & max_output_dim in advance:
 max_input_dim = 6  # e.g., max of (4, 6, 2)
 max_output_dim = 3  # e.g., max of (2, 3, 1)
+
 
 def pad_state(state, max_dim):
     """
@@ -32,8 +32,8 @@ def sample_valid_action(action_probs, valid_action_dim):
     Samples an action from the first `valid_action_dim` entries of `action_probs`.
     If an "empty" action (>= valid_action_dim) is chosen, resample.
 
-    NOTE: This is one approach. Alternatively, you could clamp or ignore the
-    unused action probabilities.
     """
+    if torch.isnan(action_probs).any() or not torch.isfinite(action_probs).all():
+        raise ValueError(f"Invalid action probabilities: {action_probs}")
     dist = torch.distributions.Categorical(action_probs[0, :valid_action_dim])
     return dist.sample()
