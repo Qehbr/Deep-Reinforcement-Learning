@@ -1,13 +1,10 @@
 import time
-from time import sleep
-
-from torch import Tensor
 from tqdm import tqdm
 import numpy as np
 import torch
 
 from assignment3.device import get_device
-from assignment3.dim_alignment import pad_state, sample_valid_action
+from assignment3.dim_alignment import pad_state
 
 
 def training_loop(
@@ -22,13 +19,14 @@ def training_loop(
         episodes,
         gamma,
         writer,
-        rewards_per_episode
+        rewards_per_episode,
+        action_selector
 ):
     device = get_device()
     # Start timing
     start_time = time.time()
-    epsilon = 0.999
-    epsilon_decay = 0.99995
+
+    # Training loop
     with tqdm(total=episodes, desc="Training", unit="episode") as pbar:
         for episode in range(episodes):
             state, _ = env.reset()
@@ -46,16 +44,8 @@ def training_loop(
                 action_probs = policy_network(state_tensor)
 
                 # Step in the environment
-                if env_name == "MountainCarContinuous-v0":
-                    # Epsilon-greedy action for continuous action space
-                    action = epsilon_greedy_action(action_probs, epsilon=epsilon)
-                    log_prob_action = torch.log(action_probs[0, 0])
-                    next_state, reward, done, truncated, _info = env.step(np.array([action.item()]))
-                else:
-                    # Sample valid action from first 'actual_act_dim' entries
-                    action = sample_valid_action(action_probs, valid_action_dim=actual_act_dim)
-                    log_prob_action = torch.log(action_probs[0, action])
-                    next_state, reward, done, truncated, _info = env.step(action.item())
+                action, log_prob_action = action_selector.select_action(action_probs, valid_action_dim=actual_act_dim)
+                next_state, reward, done, truncated, _info = env.step(action)
                 total_reward += reward
 
                 # Pad next state
@@ -104,12 +94,13 @@ def training_loop(
             if check_solved(env_name, avg_reward, episode):
                 break
 
-            epsilon *= epsilon_decay
+            action_selector.decay_epsilon()
             pbar.update(1)
     # End timing
     train_time = time.time() - start_time
 
     return train_time
+
 
 def check_solved(env_name, avg_reward, episode):
     if env_name == "CartPole-v1" and avg_reward >= 475.0:
@@ -122,13 +113,3 @@ def check_solved(env_name, avg_reward, episode):
         print(f"Solved {env_name} in {episode + 1} episodes!")
         return True
     return False
-
-def epsilon_greedy_action(action_probs, epsilon):
-    # 1dim mountain car continuous action space, action_probs is a scalar, scale to [-1, 1], add noise
-    action = torch.tanh(action_probs[0, 0])
-    if torch.rand(1) < epsilon:
-        # std needs to scale according to epsilon between 0.1 and 0.5, so we will explore a lot in the beginning, but then reduce
-        scale = 0.1 + (0.5 - 0.1) * epsilon
-        noise = np.random.normal(0, scale)
-        return torch.clamp(action + noise, -1, 1)
-    return action

@@ -3,12 +3,7 @@ import json
 import numpy as np
 import optuna
 
-
-class StudyFloatParamRange:
-    def __init__(self, low, high, step):
-        self.low = low
-        self.high = high
-        self.step = step
+from assignment3.hyper_params import HyperParamsRanges
 
 
 class OptunaSearch:
@@ -22,28 +17,18 @@ class OptunaSearch:
             env_name,
             max_input_dim,
             max_output_dim,
-            hidden_sizes_theta_values,
-            hidden_sizes_w_values,
             dropout_layers,
-            gamma_values: StudyFloatParamRange,
-            alpha_theta_values: StudyFloatParamRange,
-            alpha_w_values: StudyFloatParamRange,
-            dropout_p_values: StudyFloatParamRange,
             episodes,
+            hyper_params_ranges: HyperParamsRanges,
             log_dir="runs/optuna_search",
     ):
         self.train_function = train_function
         self.env_name = env_name
         self.max_input_dim = max_input_dim
         self.max_output_dim = max_output_dim
-        self.hidden_sizes_theta_values = hidden_sizes_theta_values
-        self.hidden_sizes_w_values = hidden_sizes_w_values
         self.dropout_layers = dropout_layers
-        self.gamma_values = gamma_values
-        self.alpha_theta_values = alpha_theta_values
-        self.alpha_w_values = alpha_w_values
-        self.dropout_p_values = dropout_p_values
         self.episodes = episodes
+        self.hyper_params_ranges = hyper_params_ranges
         self.log_dir = log_dir
 
     def objective(self,
@@ -67,46 +52,19 @@ class OptunaSearch:
         """
 
         # 1. Suggest parameters from the provided candidate sets
-        hidden_sizes_theta_str = trial.suggest_categorical("hidden_sizes_theta", self.hidden_sizes_theta_values)
-        hidden_sizes_theta = fixed_hidden_theta or eval(hidden_sizes_theta_str)
-        hidden_sizes_w_str = trial.suggest_categorical("hidden_sizes_w", self.hidden_sizes_w_values)
-        hidden_sizes_w = fixed_hidden_w or eval(hidden_sizes_w_str)
-        gamma = trial.suggest_float("gamma",
-                                    low=self.gamma_values.low,
-                                    high=self.gamma_values.high,
-                                    step=self.gamma_values.step)
-        alpha_theta = trial.suggest_float("alpha_theta",
-                                          low=self.alpha_theta_values.low,
-                                          high=self.alpha_theta_values.high,
-                                          step=self.alpha_theta_values.step)
-        alpha_w = trial.suggest_float("alpha_w",
-                                      low=self.alpha_w_values.low,
-                                      high=self.alpha_w_values.high,
-                                      step=self.alpha_w_values.step)
-        dropout_p = trial.suggest_float("dropout_p",
-                                        low=self.dropout_p_values.low,
-                                        high=self.dropout_p_values.high,
-                                        step=self.dropout_p_values.step)
-
-        print(f"""\n[OPTUNA Trial {trial.number}] Env={self.env_name}:
-        hidden_sizes_theta={hidden_sizes_theta}, hidden_sizes_w={hidden_sizes_w},
-         gamma={gamma}, dropout_p={dropout_p},
-         alpha_theta={alpha_theta}, alpha_w={alpha_w}""")
+        hyper_params = self.hyper_params_ranges.suggest_hyper_params(trial, fixed_hidden_theta, fixed_hidden_w)
+        print(f"\n[OPTUNA Trial {trial.number}] Env={self.env_name}")
+        hyper_params.print()
 
         # 2. Train actor-critic with these parameters
         train_params = {
             "env_name": self.env_name,
             "input_dim": self.max_input_dim,
             "output_dim": self.max_output_dim,
-            "hidden_sizes_theta": hidden_sizes_theta,
-            "hidden_sizes_w": hidden_sizes_w,
             "dropout_layers": self.dropout_layers,
-            "alpha_theta": alpha_theta,
-            "alpha_w": alpha_w,
             "episodes": self.episodes,
-            "gamma": gamma,
-            "dropout_p": dropout_p,
-            "log_dir": f"{self.log_dir}/{self.env_name}_g{gamma}_at{alpha_theta}_aw{alpha_w}"
+            "hyper_params": hyper_params,
+            "log_dir": f"{self.log_dir}/{self.env_name}_{hyper_params.log_dir()}"
         }
 
         if source_policy_network is not None and source_value_network is not None:
@@ -171,17 +129,7 @@ class OptunaSearch:
 
         # 5. If you want the actual best networks, you can re-run the environment with best_params
         #    because we didn't store the networks themselves in the trial. We just stored metrics.
-        if fixed_hidden_theta is not None:
-            best_params["hidden_sizes_theta"] = fixed_hidden_theta
-        if fixed_hidden_w is not None:
-            best_params["hidden_sizes_w"] = fixed_hidden_w
-
-        hidden_sizes_theta = eval(best_params["hidden_sizes_theta"])
-        hidden_sizes_w = eval(best_params["hidden_sizes_w"])
-        gamma_opt = best_params["gamma"]
-        alpha_theta_opt = best_params["alpha_theta"]
-        alpha_w_opt = best_params["alpha_w"]
-        dropout_p_opt = best_params["dropout_p"]
+        hyper_params = self.hyper_params_ranges.extract_best_hyper_params(best_params, fixed_hidden_theta, fixed_hidden_w)
 
         # write the best hyperparameters to a json file
         file_name = f"best_params/{study_name}.json"
@@ -192,15 +140,10 @@ class OptunaSearch:
             env_name=self.env_name,
             input_dim=self.max_input_dim,
             output_dim=self.max_output_dim,
-            hidden_sizes_theta=hidden_sizes_theta,
-            hidden_sizes_w=hidden_sizes_w,
             dropout_layers=self.dropout_layers,
-            alpha_theta=alpha_theta_opt,
-            alpha_w=alpha_w_opt,
             episodes=self.episodes,
-            gamma=gamma_opt,
-            dropout_p=dropout_p_opt,
-            log_dir=f"{self.log_dir}/{self.env_name}_best_ht{hidden_sizes_theta}_hw{hidden_sizes_w}_g{gamma_opt}_at{alpha_theta_opt}_aw{alpha_w_opt}"
+            hyper_params=hyper_params,
+            log_dir=f"{self.log_dir}/{self.env_name}_best_{hyper_params.log_dir()}"
         )
 
         # 6. Print total search time
