@@ -1,4 +1,4 @@
-# Deep Reinforcement Learning - Policy Gradient Methods
+# Deep Reinforcement Learning
 ## Assignments for course Deep Reinforcement Learning
 
 * **REINFORCE**
